@@ -1,7 +1,7 @@
 var Bot = require('bot');
 var PF = require('pathfinding');
-var bot = new Bot('lfpmiry6', 'training', 'http://vindinium.org'); //Put your bot's code here and change training to Arena when you want to fight others.
-// var bot = new Bot('YOUR_KEY_HERE', 'arena', 'http//52.8.116.125:9000'); //Put your bot's code here and change training to Arena when you want to fight others.
+// var bot = new Bot('YOUR KEY HERE', 'arena', 'http://vindinium.org'); //Put your bot's code here and change training to Arena when you want to fight others.
+var bot = new Bot('YOUR KEY HERE', 'arena', 'http://52.53.211.7:9000'); //Put your bot's code here and change training to Arena when you want to fight others.
 var goDir;
 var Promise = require('bluebird');
 
@@ -16,22 +16,36 @@ Bot.prototype.botBrain = function() {
          *                                      */
         
         // Set myDir to what you want and it will set bot.goDir to that direction at the end.  Unless it is "none"
+        if(bot.data.game.turn=1){
+            bot.allMines=bot.freeMines;
+        }
         var myDir;
         var myPos = [bot.yourBot.pos.x, bot.yourBot.pos.y];
-        var scare=100-bot.yourBot.life;
-        var anger=findAnger();
-        var greed=findGreed();
+        
+        
         var enemyBots = [];
+        
         if(bot.yourBot.id != 1) enemyBots.push(bot.bot1);
         if(bot.yourBot.id != 2) enemyBots.push(bot.bot2);
         if(bot.yourBot.id != 3) enemyBots.push(bot.bot3);
         if(bot.yourBot.id != 4) enemyBots.push(bot.bot4);
         
+        var enemyMines=[];
+        enemyMines=enemyMines.concat(enemyBots[0].mines);
+        enemyMines=enemyMines.concat(enemyBots[1].mines);
+        enemyMines=enemyMines.concat(enemyBots[2].mines);
+        enemyMines=enemyMines.concat(bot.freeMines);
+        // console.log(enemyMines);
+        var scare=100-bot.yourBot.life;
+        var anger=findAnger();
+        var greed=findGreed();
+        
+        
         //bot.yourBot.doubleDrink=false;
         /*                                      * 
          * This Code Decides WHAT to do         *
          *                                      */
-        
+        console.log("Anger: "+anger+" Scare: "+scare+" Greed: "+greed)
         if(scare>anger&&scare>greed){
             findTavern();
         }else if(anger>greed){
@@ -51,42 +65,68 @@ Bot.prototype.botBrain = function() {
         
         function findAnger(){
             var closePlayer=closestPlayer();
-            var distance= bot.findDistance(bot.yourBot,[closePlayer.pos.x,closePlayer.pos.y]);
-            var tempAnger= 100-distance*10-scare; 
+            var distance= bot.findDistance(myPos,[closePlayer.pos.x,closePlayer.pos.y]);
+            var mineModifier=(bot.allMines.length-closePlayer.mineCount)*10
+            var tempAnger= 100-distance*10-scare/2-mineModifier-closePlayer.life;
+            if(tempAnger>100){
+                tempAnger=100;
+            }
+            if(closePlayer.mineCount===0){
+                anger=0
+            }
             return tempAnger;
         }
         
         function findGreed(){
             var closeMine=closestMine();
-            var distance=bot.findDistance(bot.yourBot,closeMine);
-            var tempGreed=100-distance*10-scare/2;
+            var distance=bot.findDistance(myPos,closeMine);
+            // console.log(bot);
+            var mineModifier=(bot.allMines.length-bot.yourBot.mineCount)*10;
+            
+            var tempGreed=100-distance*10-scare/2+mineModifier;
+            
+            if(scare<30){
+                tempGreed=30;
+            }else if(bot.allMines===bot.yourBot.mines){
+                tempGreed=0;
+                scare=100;
+            }
             return tempGreed;
         }
         
         function findMine(){
             console.log("Claiming a Free Mine!");
-            myDir = bot.findPath(myPos, closestMine());
+            console.log(bot.findPath(myPos, closestMine()))
+            var closeMine=closestMine();
+            console.log(closeMine)
+            console.log(bot.findPath(myPos, closeMine))
+            myDir = bot.findPath(myPos, closeMine);
+            console.log(myDir)
         }
 
         function closestMine(){
-            var closestMine = bot.freeMines[0];
-            for(i = 0; i < bot.freeMines.length; i++) {
-                if(bot.findDistance(myPos, closestMine) > bot.findDistance(myPos, bot.freeMines[i])) {
-                    closestMine = bot.freeMines[i];
+            var closestMine = enemyMines[0];
+            // console.log('Closest Mine:'+ closestMine)
+            for(i = 0; i < enemyMines.length; i++) {
+                if(bot.findDistance(myPos, closestMine) > bot.findDistance(myPos, enemyMines[i])&&bot.findPath(myPos, enemyMines[i])!=='none') {
+                    closestMine = enemyMines[i];
                 }
+                // console.log('Closest Mine:'+ closestMine)
             }
+            // console.log(closestMine)
             return closestMine;
         }
         
         function findTavern(){
+            console.log("Going to Tavern");
             myDir= bot.findPath(myPos, closestTavern())
         }
         
         function closestTavern(){
             var closestTavern=bot.taverns[0];
             for(i=0;i<bot.taverns.length;i++){
-                if(bot.findDistance(myPos,closestTavern)>bot.findDistance(myPos,bot.freeMines[i])){
-                    closestTavern=bot.freeMines[i];
+                if(bot.findDistance(myPos,closestTavern)>bot.findDistance(myPos,bot.taverns[i])){
+                    closestTavern=bot.taverns[i];
                 }
             }
             return closestTavern;
